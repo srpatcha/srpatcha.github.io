@@ -1,0 +1,62 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate HTML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate HTML
+        uses: anishathalye/proof-html@v2
+        with:
+          directory: .
+          check_html: true
+          check_opengraph: true
+          enforce_https: false
+          ignore_missing_alt: true
+          ignore_empty_alt: true
+        continue-on-error: true
+
+      - name: Check file sizes
+        run: |
+          echo "=== File sizes ==="
+          find . -name "*.html" -o -name "*.css" -o -name "*.js" | head -20 | xargs ls -lh
+          echo "=== Total size ==="
+          du -sh .
+
+  deploy:
+    name: Deploy
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
